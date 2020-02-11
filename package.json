@@ -4,7 +4,8 @@
   "description": "基于vue的日历应用",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "release": "standard-version"
   },
   "husky": {
     "hooks": {
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@commitlint/cli": "^8.3.5",
     "@commitlint/config-conventional": "^8.3.4",
-    "husky": "^4.2.1"
+    "husky": "^4.2.1",
+    "standard-version": "^7.1.0"
   }
 }
