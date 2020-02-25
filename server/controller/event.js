@@ -10,9 +10,15 @@ module.exports = {
         data: event.toJSON()
       })
     } catch(err) {
+      let errMsg = []
+      if (err.errors) {
+        err.errors.forEach(error => {
+          errMsg.push(error.message)
+        })
+      }
       res.status(400).send({
         code: 400,
-        msg: err.message
+        msg: errMsg
       })
     }
   }
