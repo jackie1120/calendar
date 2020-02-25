@@ -1,12 +1,14 @@
 const express = require('express')
 const morgan = require('morgan')
 const bodyParse = require('body-parser')
+const cors = require('cors')
 const { sequelize } = require('./model')
 const port = process.env.PORT || 3000
 
 const app = express()
 app.use(bodyParse.json())
 app.use(morgan('combined'))
+app.use(cors())
 require('./router')(app)
 
 sequelize

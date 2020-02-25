@@ -16,7 +16,7 @@ module.exports = {
           errMsg.push(error.message)
         })
       }
-      res.status(400).send({
+      res.status(200).send({
         code: 400,
         msg: errMsg
       })

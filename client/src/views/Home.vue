@@ -28,6 +28,7 @@
         <div
           class="calendar__date"
           v-for="item in days"
+          @click="showEventDialog(item)"
           :key="item.date"
           :class="{
             'calendar__date--pre': item.type === 'pre',
@@ -47,17 +48,43 @@
         </div>
       </div>
     </main>
+    <el-dialog title="事件" :visible.sync="eventDialogShown" width="60%">
+      <el-form :model="form" :rules="rules" ref="form">
+        <el-form-item label="标题" label-width="120px" prop="title">
+          <el-input v-model="form.title"></el-input>
+        </el-form-item>
+        <el-form-item label="描述" label-width="120px" prop="description">
+          <el-input type="textarea" :rows="3" v-model="form.description"></el-input>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="eventDialogShown = false">取 消</el-button>
+        <el-button type="primary" @click="saveEvent()">确 定</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
+import eventService from '@/service/eventService'
+
 export default {
   name: "home",
   data() {
     return {
       days: [],
       formatter: "M-D",
-      selectedDate: ""
+      selectedDate: "",
+      eventDialogShown: false,
+      form: {
+        title: '',
+        description: '',
+        date: ''
+      },
+      rules: {
+        title: {required: true, message: '请输入活动名称', trigger: 'blur'},
+        description: {required: true, message: '请输入活动描述', trigger: 'blur'}
+      }
     };
   },
   computed: {
@@ -71,6 +98,26 @@ export default {
     this.initDays();
   },
   methods: {
+    showEventDialog(date) {
+      this.form.date = date.date
+      this.eventDialogShown = true;
+    },
+    saveEvent() {
+      this.$refs['form'].validate(async (valid) => {
+        if (valid) {
+          console.log(this.form);
+          try {
+            await eventService.create(this.form)
+            // TODO: 创建成功回显到界面
+            this.eventDialogShown = false;
+          } catch (e) {
+            this.$message.error(e.message)
+          }
+        } else {
+          return false;
+        }
+      })
+    },
     initDays() {
       this.days = [];
       let daysInMonth = this.$moment(this.selectedDate).daysInMonth();
@@ -132,7 +179,7 @@ export default {
 </script>
 <style lang="scss" scoped>
 .calendar {
-  margin: 8px;
+  padding: 8px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
