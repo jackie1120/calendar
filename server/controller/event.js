@@ -24,6 +24,31 @@ module.exports = {
       })
     }
   },
+  async update(req, res) {
+    try {
+      delete req.body.id
+      const event = await Event.findByPk(req.params.id)
+      await event.update(req.body)
+      res.send({
+        code: 0,
+        msg: 'success',
+        data: event.toJSON()
+      })
+    } catch(err) {
+      let errMsg = []
+      if (err.errors) {
+        err.errors.forEach(error => {
+          errMsg.push(error.message)
+        })
+      }else {
+        errMsg.push(err.message)
+      }
+      res.status(200).send({
+        code: 400,
+        msg: errMsg
+      })
+    }
+  },
   async get(req, res) {
     let startDate = req.query.startDate
     let endDate = req.query.endDate

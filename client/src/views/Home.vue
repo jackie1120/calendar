@@ -25,27 +25,14 @@
         <div class="calendar__weekday-title">周日</div>
       </div>
       <div class="calendar__table">
-        <div
-          class="calendar__date"
+        <calendar-day
           v-for="item in days"
-          @click="showEventDialog(item)"
-          :key="item.date"
-          :class="{
-            'calendar__date--pre': item.type === 'pre',
-            'calendar__date--next': item.type === 'next'
-          }"
-        >
-          <span
-            class="calendar__date-title"
-            :class="
-              currentDate === item.formatDate ? 'calendar__date--current' : ''
-            "
-            >{{ item.formatDate }}</span
-          >
-          <ul class="calendar__event">
-            <li class="calendar__event-item">测试</li>
-          </ul>
-        </div>
+          @create="createEvent(item)"
+          @edit="editEvent"
+          :key="item.formatDate"
+          :item="item"
+          :events="events"
+        ></calendar-day>
       </div>
     </main>
     <el-dialog title="事件" :visible.sync="eventDialogShown" width="60%">
@@ -54,7 +41,11 @@
           <el-input v-model="form.title"></el-input>
         </el-form-item>
         <el-form-item label="描述" label-width="120px" prop="description">
-          <el-input type="textarea" :rows="3" v-model="form.description"></el-input>
+          <el-input
+            type="textarea"
+            :rows="3"
+            v-model="form.description"
+          ></el-input>
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
@@ -66,26 +57,41 @@
 </template>
 
 <script>
-import eventService from '@/service/eventService'
+import eventService from "@/service/eventService";
+import CalendarDay from "./components/CalendarDay";
 
 export default {
   name: "home",
   data() {
     return {
       days: [],
+      events: {},
       formatter: "M-D",
       selectedDate: "",
       eventDialogShown: false,
+      eventDialogType: "",
       form: {
-        title: '',
-        description: '',
-        date: ''
+        id: "",
+        title: "",
+        description: "",
+        date: ""
       },
       rules: {
-        title: {required: true, message: '请输入活动名称', trigger: 'blur'},
-        description: {required: true, message: '请输入活动描述', trigger: 'blur'}
+        title: { required: true, message: "请输入活动名称", trigger: "blur" },
+        description: {
+          required: true,
+          message: "请输入活动描述",
+          trigger: "blur"
+        }
+      },
+      search: {
+        starDate: "",
+        endDate: ""
       }
     };
+  },
+  components: {
+    CalendarDay
   },
   computed: {
     title() {
@@ -98,34 +104,77 @@ export default {
     this.initDays();
   },
   methods: {
-    showEventDialog(date) {
-      this.form.date = date.date
+    editEvent(event) {
       this.eventDialogShown = true;
+      this.eventDialogType = "edit";
+      this.form.title = event.title;
+      this.form.description = event.description;
+      this.form.id = event.id;
+      this.form.date = event.date;
+    },
+    createEvent(date) {
+      this.form.date = date.date;
+      this.eventDialogShown = true;
+      this.eventDialogType = "create";
     },
     saveEvent() {
-      this.$refs['form'].validate(async (valid) => {
+      this.$refs["form"].validate(async valid => {
         if (valid) {
-          console.log(this.form);
           try {
-            await eventService.create(this.form)
-            // TODO: 创建成功回显到界面
+            let event;
+            this.eventDialogType === "create" &&
+              (event = await eventService.create(this.form));
+            this.eventDialogType === "edit" &&
+              (event = await eventService.update(this.form));
+            this.form.title = "";
+            this.form.description = "";
+            this.refreshEvent(event.data);
             this.eventDialogShown = false;
           } catch (e) {
-            this.$message.error(e.message)
+            this.$message.error(e.message);
           }
         } else {
           return false;
         }
-      })
+      });
+    },
+    refreshEvent(event) {
+      let date = this.$moment(this.form.date).format("YYYY-MM-DD");
+      if (this.eventDialogType === "create") {
+        if (typeof this.events[date] === "undefined")
+          this.events = Object.assign({}, this.events, { [date]: [event] });
+        else {
+          this.events[date].push(event);
+        }
+      } else {
+        this.events[date] = this.events[date].map(item => {
+          if (item.id === event.id) {
+            item = Object.assign({}, item, {
+              title: event.title,
+              description: event.description
+            });
+          }
+          return item;
+        });
+      }
+    },
+    async getEvents() {
+      try {
+        const result = await eventService.getEvents(
+          this.search.starDate,
+          this.search.endDate
+        );
+        this.events = Object.assign({}, result.data);
+      } catch (e) {
+        this.$message.error(e.message);
+      }
     },
     initDays() {
       this.days = [];
       let daysInMonth = this.$moment(this.selectedDate).daysInMonth();
       for (let i = 1; i <= daysInMonth; i++) {
         this.days.push({
-          date: this.$moment(this.selectedDate)
-            .date(i)
-            .format(),
+          date: this.$moment(this.selectedDate).date(i),
           formatDate: this.$moment(this.selectedDate)
             .date(i)
             .format(this.formatter),
@@ -141,7 +190,7 @@ export default {
       if (i === 0) i = 7;
       while (i > 1) {
         this.days.unshift({
-          date: firstDate.subtract(1, "days").format(),
+          date: firstDate.subtract(1, "days"),
           formatDate: firstDate.format(this.formatter),
           num: firstDate.date(),
           type: "pre"
@@ -153,12 +202,17 @@ export default {
       );
       for (let i = lastDate.day(); i < 7; i++) {
         this.days.push({
-          date: lastDate.add(1, "days").format(),
+          date: lastDate.add(1, "days"),
           formatDate: lastDate.format(this.formatter),
           num: lastDate.date(),
           type: "next"
         });
       }
+      let starDate = this.days[0];
+      let endDate = this.days[this.days.length - 1];
+      this.search.starDate = starDate.date.format("YYYY-MM-DD");
+      this.search.endDate = endDate.date.format("YYYY-MM-DD");
+      this.getEvents();
     },
     nextMonth() {
       let currentDateObj = this.$moment(this.selectedDate);
@@ -212,28 +266,6 @@ export default {
     flex-wrap: wrap;
     align-items: stretch;
     flex: 1;
-    .calendar__date {
-      flex: 0 1 14.28%;
-      border: 1px solid #ccc;
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
-      .calendar__date-title {
-        padding: 8px;
-      }
-      .calendar__event {
-        margin: 0;
-        padding: 0 8px;
-        list-style: none;
-      }
-    }
-    .calendar__date--current {
-      color: #409eff;
-    }
-    .calendar__date--next,
-    .calendar__date--pre {
-      background-color: #dcdfe6;
-    }
   }
 }
 </style>
